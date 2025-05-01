@@ -1,3 +1,6 @@
+QUICK Link to the Project: *https://peterchen1216.github.io/classmatemap/*
+快速链接：*QUICK Link to the Project: *https://peterchen1216.github.io/classmatemap/*
+
 #######################################################################################
 # CengFan Map (Web Version)
 
@@ -57,4 +60,4 @@ This is the **CengFan Map** web application, created by "Peter Chen" - students 
   - Claude 3.7 Sonnet 人工智能  
   - HTML5  
   - [OpenStreetMap.org](https://www.openstreetmap.org)
-#######################################################################################
+#################################################################################
