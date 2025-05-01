@@ -1,5 +1,4 @@
-QUICK Link to the Project: *https://peterchen1216.github.io/classmatemap/*
-快速链接：*QUICK Link to the Project: *https://peterchen1216.github.io/classmatemap/*
+QUICK Link to the Project/快速链接: *https://peterchen1216.github.io/classmatemap/*
 
 #######################################################################################
 # CengFan Map (Web Version)
