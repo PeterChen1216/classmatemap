@@ -207,7 +207,7 @@
                 </div>
                 <div class="import-instructions">
                     <p>请使用Excel模板收集同学信息，然后通过上面的按钮导入。</p>
-                    <p>模板中必须包含以下列：姓名、地点、学校/单位、备注</p>
+                    <p>模板中必须包含以下列：姓名、城市（中文）、城市（英文）、国家（中文）、国家（英文）、学校/单位、备注</p>
                 </div>
             </div>
             <button id="export-data">导出当前数据</button>
@@ -246,6 +246,96 @@
         // Friend data storage
         let friends = JSON.parse(localStorage.getItem('friends') || '[]');
         const markers = {};
+        
+        // 城市和国家名称中英文对照表
+        const cityCountryTranslations = {
+            // 城市对照
+            "beijing": "北京",
+            "北京": "beijing",
+            "shanghai": "上海",
+            "上海": "shanghai",
+            "guangzhou": "广州",
+            "广州": "guangzhou",
+            "hong kong": "香港",
+            "香港": "hong kong",
+            "taipei": "台北",
+            "台北": "taipei",
+            "tokyo": "东京",
+            "东京": "tokyo",
+            "seoul": "首尔",
+            "首尔": "seoul",
+            "new york": "纽约",
+            "纽约": "new york",
+            "london": "伦敦",
+            "伦敦": "london",
+            "paris": "巴黎",
+            "巴黎": "paris",
+            "berlin": "柏林",
+            "柏林": "berlin",
+            "seattle": "西雅图",
+            "西雅图": "seattle",
+            "san francisco": "旧金山",
+            "旧金山": "san francisco",
+            "los angeles": "洛杉矶",
+            "洛杉矶": "los angeles",
+            "chicago": "芝加哥",
+            "芝加哥": "chicago",
+            "boston": "波士顿",
+            "波士顿": "boston",
+            "sydney": "悉尼",
+            "悉尼": "sydney",
+            "melbourne": "墨尔本",
+            "墨尔本": "melbourne",
+            "toronto": "多伦多",
+            "多伦多": "toronto",
+            "vancouver": "温哥华",
+            "温哥华": "vancouver",
+            "singapore": "新加坡",
+            "新加坡": "singapore",
+            "bangkok": "曼谷",
+            "曼谷": "bangkok",
+            "dubai": "迪拜",
+            "迪拜": "dubai",
+            
+            // 国家对照
+            "china": "中国",
+            "中国": "china",
+            "japan": "日本",
+            "日本": "japan",
+            "usa": "美国",
+            "美国": "usa",
+            "united states": "美国",
+            "uk": "英国",
+            "england": "英国",
+            "英国": "uk",
+            "france": "法国",
+            "法国": "france",
+            "germany": "德国",
+            "德国": "germany",
+            "australia": "澳大利亚",
+            "澳大利亚": "australia",
+            "canada": "加拿大",
+            "加拿大": "canada",
+            "singapore": "新加坡",
+            "新加坡": "singapore",
+            "thailand": "泰国",
+            "泰国": "thailand",
+            "korea": "韩国",
+            "韩国": "korea",
+            "south korea": "韩国",
+            "india": "印度",
+            "印度": "india",
+            "russia": "俄罗斯",
+            "俄罗斯": "russia",
+            "italy": "意大利",
+            "意大利": "italy",
+            "spain": "西班牙",
+            "西班牙": "spain",
+            "brazil": "巴西",
+            "巴西": "brazil",
+            "mexico": "墨西哥",
+            "墨西哥": "mexico"
+        };
         
         // Famous landmark icons for major cities
         const landmarkIcons = {
@@ -303,29 +393,49 @@
             const resultsContainer = document.getElementById('search-results');
             
             if (!query) {
-                resultsContainer.innerHTML = '<p>请输入城市或国家来检索。</p>';
+                resultsContainer.innerHTML = '<p>请输入城市或国家来检索（支持中英文）。</p>';
                 return;
             }
             
-            // Filter friends based on query
-            const filteredFriends = friends.filter(friend => 
-                friend.location.toLowerCase().includes(query)
-            );
+            // 获取查询的所有可能形式（中英文）
+            const possibleQueries = [query];
+            
+            // 添加翻译版本
+            if (cityCountryTranslations[query]) {
+                possibleQueries.push(cityCountryTranslations[query]);
+            }
+            
+            // 检查是否是部分匹配，如查询"new"可以匹配"new york"
+            for (const key in cityCountryTranslations) {
+                if (key.includes(query) && !possibleQueries.includes(key)) {
+                    possibleQueries.push(key);
+                    // 如果找到英文部分匹配，也添加对应的中文
+                    if (cityCountryTranslations[key] && !possibleQueries.includes(cityCountryTranslations[key])) {
+                        possibleQueries.push(cityCountryTranslations[key]);
+                    }
+                }
+            }
+            
+            // Filter friends based on all possible queries
+            const filteredFriends = friends.filter(friend => {
+                // 检查所有位置相关字段
+                const cityZhMatch = friend.cityZh && friend.cityZh.toLowerCase().includes(query);
+                const cityEnMatch = friend.cityEn && friend.cityEn.toLowerCase().includes(query);
+                const countryZhMatch = friend.countryZh && friend.countryZh.toLowerCase().includes(query);
+                const countryEnMatch = friend.countryEn && friend.countryEn.toLowerCase().includes(query);
+                
+                // 检查旧版位置字段（兼容旧数据）
+                const locationMatch = friend.location && possibleQueries.some(q => 
+                    friend.location.toLowerCase().includes(q)
+                );
+                
+                return cityZhMatch || cityEnMatch || countryZhMatch || countryEnMatch || locationMatch;
+            });
             
             if (filteredFriends.length === 0) {
                 resultsContainer.innerHTML = '<p>未找到在此位置的同学。</p>';
                 return;
             }
-            
-            // Group friends by school
-            const friendsBySchool = {};
-            filteredFriends.forEach(friend => {
-                const school = friend.school || '未填写学校';
-                if (!friendsBySchool[school]) {
-                    friendsBySchool[school] = [];
-                }
-                friendsBySchool[school].push(friend);
-            });
             
             // 构建显示的查询词（同时展示中英文）
             let displayQuery = query;
@@ -340,14 +450,32 @@
             // List of schools
             resultsHTML += '<h4>按学校/单位:</h4>';
             
+            // Group friends by school
+            const friendsBySchool = {};
+            filteredFriends.forEach(friend => {
+                const school = friend.school || '未填写学校';
+                if (!friendsBySchool[school]) {
+                    friendsBySchool[school] = [];
+                }
+                friendsBySchool[school].push(friend);
+            });
+            
             for (const school in friendsBySchool) {
                 resultsHTML += `<div class="search-result-school">
                     <h4>${school}</h4>
                     <ul>`;
                 
                 friendsBySchool[school].forEach(friend => {
+                    // 确定要在结果中显示的位置信息
+                    let displayLocation = friend.location;
+                    if (!displayLocation && (friend.cityZh || friend.cityEn || friend.countryZh || friend.countryEn)) {
+                        const city = friend.cityZh || friend.cityEn || '';
+                        const country = friend.countryZh || friend.countryEn || '';
+                        displayLocation = city + (city && country ? ', ' : '') + country;
+                    }
+                    
                     resultsHTML += `<li class="search-result-item" data-id="${friend.id}">
-                        <strong>${friend.name}</strong> - ${highlightText(friend.location, query)}
+                        <strong>${friend.name}</strong> - ${highlightText(displayLocation, query)}
                     </li>`;
                 });
                 
@@ -373,6 +501,8 @@
         
         // Helper function to highlight search term in text
         function highlightText(text, query) {
+            if (!text) return '';
+            
             const lowerText = text.toLowerCase();
             const index = lowerText.indexOf(query.toLowerCase());
             
@@ -464,6 +594,8 @@
                     displayLocation = `${cityZh}, ${countryZh}`;
                 } else if (cityEn && countryEn) {
                     displayLocation = `${cityEn}, ${countryEn}`;
+                } else if (cityZh || cityEn) {
+                    displayLocation = [cityZh, cityEn].filter(Boolean).join('/');
                 } else {
                     displayLocation = geocodeLocation;
                 }
@@ -471,12 +603,7 @@
                 const school = record['学校/单位'] || '';
                 const notes = record['备注'] || '';
                 
-                if (!name || (!cityZh && !cityEn)) {
-                    errorCount++;
-                    continue;
-                }
-                
-                if (!geocodeLocation) {
+                if (!name || !geocodeLocation) {
                     errorCount++;
                     continue;
                 }
@@ -590,7 +717,11 @@
                 for (const id in markers) {
                     map.removeLayer(markers[id]);
                 }
-                markers = {};
+                
+                // Reset markers object
+                Object.keys(markers).forEach(key => {
+                    delete markers[key];
+                });
                 
                 // Update friend list
                 updateFriendList();
@@ -601,16 +732,24 @@
         
         // Add marker to map
         function addMarkerToMap(friend) {
-            const { id, name, location, school, notes, coordinates } = friend;
+            const { id, name, location, cityZh, cityEn, countryZh, countryEn, school, notes, coordinates } = friend;
             
             // Check if the location contains a famous landmark city
             let landmark = null;
             let iconColor = "#3498db";
-            let locationLower = location.toLowerCase();
+            
+            // 优先使用英文城市名检查地标
+            let cityToCheck = (cityEn || '').toLowerCase();
+            if (!cityToCheck) {
+                cityToCheck = (cityZh || '').toLowerCase();
+            }
+            
+            // 如果没有分别的城市字段，则检查完整位置字符串（兼容旧数据）
+            let locationLower = (location || '').toLowerCase();
             
             // Check for landmark match in the location
             for (const city in landmarkIcons) {
-                if (locationLower.includes(city)) {
+                if ((cityToCheck && cityToCheck.includes(city)) || (locationLower && locationLower.includes(city))) {
                     landmark = landmarkIcons[city];
                     
                     // Set special colors for specific landmarks
@@ -650,6 +789,10 @@
             // Create marker
             const marker = L.marker(coordinates, { icon: customIcon }).addTo(map);
             
+            // 显示城市和国家（优先使用中文）
+            const displayCity = cityZh || cityEn || '';
+            const displayCountry = countryZh || countryEn || '';
+            
             // Create popup content with landmark name
             const popupContent = `
                 <div class="popup-content">
@@ -657,7 +800,7 @@
                     <p><strong>地点:</strong> ${location}</p>
                     ${school ? `<p><strong>学校/单位:</strong> ${school}</p>` : ''}
                     ${notes ? `<p><strong>备注:</strong> ${notes}</p>` : ''}
-                    ${getLandmarkName(locationLower) ? `<p><strong>地标:</strong> ${getLandmarkName(locationLower)}</p>` : ''}
+                    ${getLandmarkName(cityToCheck || locationLower) ? `<p><strong>地标:</strong> ${getLandmarkName(cityToCheck || locationLower)}</p>` : ''}
                     <button onclick="deleteFriend('${id}')">删除</button>
                 </div>
             `;
@@ -679,7 +822,18 @@
             friends.forEach(friend => {
                 const item = document.createElement('div');
                 item.className = 'friend-item';
-                item.textContent = `${friend.name} - ${friend.location}`;
+                
+                // 显示姓名和位置
+                // 对于新数据格式，优先使用中文
+                let displayLocation = friend.location;
+                if (!displayLocation && (friend.cityZh || friend.cityEn || friend.countryZh || friend.countryEn)) {
+                    const city = friend.cityZh || friend.cityEn || '';
+                    const country = friend.countryZh || friend.countryEn || '';
+                    displayLocation = city + (city && country ? ', ' : '') + country;
+                }
+                
+                item.textContent = `${friend.name} - ${displayLocation}`;
+                
                 item.addEventListener('click', () => {
                     map.setView(friend.coordinates, 12);
                     markers[friend.id].openPopup();
@@ -690,6 +844,8 @@
         
         // Function to get landmark name from location
         function getLandmarkName(locationLower) {
+            if (!locationLower) return "";
+            
             for (const city in landmarkIcons) {
                 if (locationLower.includes(city)) {
                     switch(city) {
@@ -744,6 +900,11 @@
         
         // Load friends when page loads
         window.addEventListener('load', loadFriends);
+
+        // 添加控制台错误监听，方便调试
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript错误:', e.message, 'at', e.filename, 'line', e.lineno);
+        });
     </script>
 </body>
 </html>
