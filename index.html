@@ -30,24 +30,6 @@
             max-width: 350px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .import-form input, .import-form button {
-            width: 100%;
-            margin-bottom: 10px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .import-form button {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .import-form button:hover {
-            background: #45a049;
-        }
         .friend-list {
             margin-top: 15px;
             max-height: 300px;
@@ -155,22 +137,6 @@
         .tab-content.active {
             display: block;
         }
-        .template-download {
-            margin-top: 15px;
-            text-align: center;
-        }
-        .template-download a {
-            color: #4CAF50;
-            text-decoration: none;
-        }
-        .template-download a:hover {
-            text-decoration: underline;
-        }
-        .import-instructions {
-            margin-top: 15px;
-            font-size: 14px;
-            color: #666;
-        }
         #export-data {
             margin-top: 15px;
             width: 100%;
@@ -197,6 +163,25 @@
         .show-all-btn:hover {
             background: #2980b9;
         }
+        
+        /* 加载动画 */
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -206,33 +191,21 @@
         <h3>2011级华文班联络图</h3>
         
         <div class="tab-buttons">
-            <button class="tab-button active" data-tab="import">导入</button>
-            <button class="tab-button" data-tab="list">列表</button>
+            <!-- 隐藏导入选项卡，只保留列表和检索 -->
+            <button class="tab-button active" data-tab="list">列表</button>
             <button class="tab-button" data-tab="search">检索</button>
         </div>
         
-        <div class="tab-content active" id="import-tab">
-            <div class="import-form">
-                <input type="file" id="file-input" accept=".xlsx, .xls, .csv">
-                <button id="import-data">导入数据</button>
-                <div class="template-download">
-                    <a href="#" id="download-template">下载模板</a>
-                </div>
-                <div class="import-instructions">
-                    <p>请使用Excel模板收集同学信息，然后通过上面的按钮导入。</p>
-                    <p>模板中必须包含以下列：姓名、城市（中文）、城市（英文）、国家（中文）、国家（英文）、学校/单位、备注</p>
-                </div>
+        <div class="tab-content active" id="list-tab">
+            <div id="loading-container" class="loading">
+                <div class="loading-spinner"></div>
+                <p>正在加载同学信息...</p>
             </div>
-            <button id="export-data">导出当前数据</button>
-        </div>
-        
-        <div class="tab-content" id="list-tab">
-            <div class="friend-list" id="friends-container">
+            <div class="friend-list" id="friends-container" style="display:none;">
                 <!-- Friend list will be populated here -->
-                <div class="friend-item">尚未添加</div>
             </div>
             <button id="show-all-friends" class="show-all-btn">显示所有同学</button>
-            <button id="clear-data" style="margin-top: 15px; width: 100%; background: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">清除所有数据</button>
+            <button id="export-data" style="margin-top: 15px; width: 100%; background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">导出数据</button>
         </div>
         
         <div class="tab-content" id="search-tab">
@@ -258,8 +231,264 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
                 
+        // 预设的2011级华文班同学数据
+        const presetFriendData = [
+        { 
+            name: "陈智城", 
+            cityZh: "西雅图", 
+            cityEn: "Seattle", 
+            countryZh: "美国", 
+            countryEn: "USA", 
+            school: "University of Washington - Seattle", 
+            notes: "" 
+        },
+        { 
+            name: "王轼皓", 
+            cityZh: "杭州", 
+            cityEn: "Hangzhou", 
+            countryZh: "中国", 
+            countryEn: "CHINA", 
+            school: "浙江艺术学院", 
+            notes: "" 
+        },
+        { 
+            name: "郑雨轩", 
+            cityZh: "上海", 
+            cityEn: "Shanghai", 
+            countryZh: "中国", 
+            countryEn: "CHINA", 
+            school: "东华大学", 
+            notes: "" 
+        },
+        { 
+            name: "柯卓成", 
+            cityZh: "布达佩斯", 
+            cityEn: "Budapest", 
+            countryZh: "匈牙利", 
+            countryEn: "Hungary", 
+            school: "SEK Budapest International School", 
+            notes: "" 
+        },
+        { 
+            name: "张紫轩", 
+            cityZh: "伦敦", 
+            cityEn: "London", 
+            countryZh: "英国", 
+            countryEn: "United Kingdom", 
+            school: "UAL (University of the Arts London)", 
+            notes: "" 
+        },
+        { 
+            name: "陈星宏", 
+            cityZh: "巴黎", 
+            cityEn: "Paris", 
+            countryZh: "法国", 
+            countryEn: "France", 
+            school: "路易大帝中学 预科班", 
+            notes: "" 
+        },
+        { 
+            name: "施霁航", 
+            cityZh: "杭州", 
+            cityEn: "Hangzhou", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "浙江音乐学院", 
+            notes: "" 
+        },
+        { 
+            name: "翁罗怡", 
+            cityZh: "宁波", 
+            cityEn: "Ningbo", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "宁波大学", 
+            notes: "" 
+        },
+        { 
+            name: "林雨西", 
+            cityZh: "密歇根州", 
+            cityEn: "Ann Arbor Michigan", 
+            countryZh: "美国", 
+            countryEn: "United States", 
+            school: "密歇根大学安娜堡分校 (University of Michigan Ann Arbor)", 
+            notes: "" 
+        },
+        { 
+            name: "叶子绽", 
+            cityZh: "广东深圳", 
+            cityEn: "Shenzhen Guangdong", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "深圳大学", 
+            notes: "" 
+        },
+        { 
+            name: "余子晴", 
+            cityZh: "赫尔辛基", 
+            cityEn: "Helsinki", 
+            countryZh: "芬兰", 
+            countryEn: "Finland", 
+            school: "赫尔辛基中学 (University of Helsinki Viikki Normal School)", 
+            notes: "" 
+        },
+        { 
+            name: "戴珊珊", 
+            cityZh: "广州", 
+            cityEn: "Guangzhou", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "广州中医药大学", 
+            notes: "" 
+        },
+        { 
+            name: "林心慧", 
+            cityZh: "加州洛杉矶", 
+            cityEn: "Los Angeles California", 
+            countryZh: "美国", 
+            countryEn: "United States", 
+            school: "加州大学洛杉矶分校 (UCLA)", 
+            notes: "" 
+        },
+        { 
+            name: "林可儿", 
+            cityZh: "安大略省伦敦", 
+            cityEn: "London Ontario", 
+            countryZh: "加拿大", 
+            countryEn: "Canada", 
+            school: "西安大略大学 (Western University)", 
+            notes: "" 
+        },
+        { 
+            name: "徐嘉梁", 
+            cityZh: "巴黎", 
+            cityEn: "Paris", 
+            countryZh: "法国", 
+            countryEn: "France", 
+            school: "Université Paris 1 Panthéon-Sorbonne", 
+            notes: "" 
+        },
+        { 
+            name: "卢筝", 
+            cityZh: "杭州", 
+            cityEn: "Hangzhou", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "贝塞斯国际学校", 
+            notes: "" 
+        },
+        { 
+            name: "吴承迅", 
+            cityZh: "马德里", 
+            cityEn: "Madrid", 
+            countryZh: "西班牙", 
+            countryEn: "Spain", 
+            school: "U-tad (Centro Universitario de Tecnología y Arte Digital)", 
+            notes: "" 
+        },
+        { 
+            name: "谢谦", 
+            cityZh: "蒙特利尔", 
+            cityEn: "Montreal", 
+            countryZh: "加拿大", 
+            countryEn: "Canada", 
+            school: "Marianopolis College", 
+            notes: "" 
+        },
+        { 
+            name: "李佳颖", 
+            cityZh: "伦敦", 
+            cityEn: "London", 
+            countryZh: "英国", 
+            countryEn: "United Kingdom", 
+            school: "伦敦国王学院 (King's College London)", 
+            notes: "" 
+        },
+        { 
+            name: "孙瑶", 
+            cityZh: "佛罗伦萨", 
+            cityEn: "Florence", 
+            countryZh: "意大利", 
+            countryEn: "Italy", 
+            school: "(未定)", 
+            notes: "" 
+        },
+        { 
+            name: "黄莉雅", 
+            cityZh: "卡迪夫", 
+            cityEn: "Cardiff", 
+            countryZh: "英国", 
+            countryEn: "United Kingdom", 
+            school: "Christ College Brecon", 
+            notes: "" 
+        },
+        { 
+            name: "黄怡", 
+            cityZh: "江苏苏州", 
+            cityEn: "Suzhou Jiangsu", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "昆山科技大学", 
+            notes: "" 
+        },
+        { 
+            name: "张珈尔", 
+            cityZh: "杭州", 
+            cityEn: "Hangzhou", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "浙江中医药大学", 
+            notes: "" 
+        },
+        { 
+            name: "陈垠垠", 
+            cityZh: "绍兴", 
+            cityEn: "Shaoxing", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "", 
+            notes: "" 
+        },
+        { 
+            name: "戴心若", 
+            cityZh: "新加坡", 
+            cityEn: "Singapore", 
+            countryZh: "新加坡", 
+            countryEn: "Singapore", 
+            school: "华侨中学 (Hwa Chong Institution)", 
+            notes: "" 
+        },
+        { 
+            name: "戴若彤", 
+            cityZh: "圣保罗", 
+            cityEn: "São Paulo", 
+            countryZh: "巴西", 
+            countryEn: "Brazil", 
+            school: "Santa Catarina de Sena", 
+            notes: "" 
+        },
+        { 
+            name: "钟子修", 
+            cityZh: "波士顿", 
+            cityEn: "Boston", 
+            countryZh: "美国", 
+            countryEn: "United States", 
+            school: "东北大学 (Northeastern University)", 
+            notes: "" 
+        },
+        { 
+            name: "斯泓博", 
+            cityZh: "杭州", 
+            cityEn: "Hangzhou", 
+            countryZh: "中国", 
+            countryEn: "China", 
+            school: "", 
+            notes: "" 
+        }
+        ];
+        
         // Friend data storage
-        let friends = JSON.parse(localStorage.getItem('friends') || '[]');
+        let friends = [];
         const markers = {};
         
         // 城市和国家名称中英文对照表
@@ -352,29 +581,129 @@
             "墨西哥": "mexico"
         };
         
-        // Famous landmark icons for major cities
-        const landmarkIcons = {
-            "seattle": "🏙️",  // Space Needle
-            "paris": "🗼",  // Eiffel Tower
-            "new york": "🗽",  // Statue of Liberty
-            "london": "⏰",  // Big Ben
-            "rome": "🏛️",  // Colosseum
-            "tokyo": "🗼",  // Tokyo Tower
-            "sydney": "🏛️",  // Opera House
-            "dubai": "🏙️",  // Burj Khalifa
-            "beijing": "🏯",  // Forbidden City
-            "shanghai": "🏙️",  // Oriental Pearl
-            "hong kong": "🏙️",  // Victoria Peak
-            "cairo": "🔺",  // Pyramids
-            "athens": "🏛️",  // Parthenon
-            "rio": "🗿",  // Christ the Redeemer
-            "san francisco": "🌉",  // Golden Gate
-            "venice": "⛵",  // Gondola
-            "barcelona": "⛪",  // Sagrada Familia
-            "las vegas": "🎰",  // Casino
-            "moscow": "🏰",  // Kremlin
-            "taipei": "🏙️"   // Taipei 101
-        };
+        // 只保留有同学所在城市的地标图标
+const landmarkIcons = {
+  // 美国城市
+  "seattle": "🏙️",          // 西雅图 - Space Needle
+  "ann arbor": "🏛️",        // 安娜堡 - 密歇根大学主楼
+  "los angeles": "🌴",      // 洛杉矶 - 好莱坞标志
+  "boston": "🏫",           // 波士顿 - 哈佛/MIT
+
+  // 中国城市
+  "shanghai": "🗼",         // 上海 - 东方明珠
+  "hangzhou": "🌉",         // 杭州 - 西湖断桥
+  "ningbo": "🏯",           // 宁波 - 天一阁
+  "shenzhen": "🏙️",         // 深圳 - 平安大厦
+  "guangzhou": "🗼",        // 广州 - 广州塔
+  "suzhou": "🏯",           // 苏州 - 苏州园林
+  "shaoxing": "🏞️",         // 绍兴 - 鲁迅故里/乌篷船
+
+  // 欧洲城市
+  "budapest": "🌉",         // 布达佩斯 - 塞切尼链桥
+  "london": "⏰",           // 伦敦 - 大本钟
+  "paris": "🗼",            // 巴黎 - 埃菲尔铁塔
+  "helsinki": "⛪",         // 赫尔辛基 - 赫尔辛基大教堂
+  "madrid": "🏰",           // 马德里 - 马德里王宫
+  "florence": "🏛️",         // 佛罗伦萨 - 圣母百花大教堂
+  "cardiff": "🏰",          // 卡迪夫 - 卡迪夫城堡
+
+  // 其他国家城市
+  "singapore": "🦁",        // 新加坡 - 鱼尾狮
+  "montreal": "🏙️",         // 蒙特利尔 - 蒙特利尔奥林匹克体育场
+  "são paulo": "🗿",        // 圣保罗 - 保利斯塔大道
+};
+
+// 为每个城市设置特定的颜色代码
+const landmarkColors = {
+  // 美国城市 - 蓝色系
+  "seattle": "#2c3e50",      // 深蓝色
+  "ann arbor": "#3498db",    // 浅蓝色
+  "los angeles": "#2980b9",  // 中蓝色
+  "boston": "#1f618d",       // 海军蓝
+
+  // 中国城市 - 红色系
+  "shanghai": "#e74c3c",     // 红色
+  "hangzhou": "#c0392b",     // 深红色
+  "ningbo": "#cd6155",       // 砖红色
+  "shenzhen": "#cb4335",     // 暗红色
+  "guangzhou": "#922b21",    // 棕红色
+  "suzhou": "#a93226",       // 红褐色
+  "shaoxing": "#b03a2e",     // 深红褐色
+
+  // 欧洲城市 - 绿色系
+  "budapest": "#27ae60",     // 绿色
+  "london": "#229954",       // 森林绿
+  "paris": "#2ecc71",        // 翠绿色
+  "helsinki": "#1e8449",     // 深绿色
+  "madrid": "#196f3d",       // 墨绿色
+  "florence": "#28b463",     // 鲜绿色
+  "cardiff": "#239b56",      // 翠绿色
+
+  // 其他国家城市 - 其他颜色
+  "singapore": "#f39c12",    // 橙色
+  "montreal": "#d35400",     // 深橙色
+  "são paulo": "#e67e22",    // 淡橙色
+};
+
+// 各城市地标名称对照表
+const landmarkNames = {
+  "seattle": "太空针塔 (Space Needle)",
+  "ann arbor": "密歇根大学中央校区 (University of Michigan)",
+  "los angeles": "好莱坞标志 (Hollywood Sign)",
+  "boston": "波士顿公共图书馆 (Boston Public Library)",
+  
+  "shanghai": "东方明珠电视塔",
+  "hangzhou": "西湖断桥",
+  "ningbo": "天一阁",
+  "shenzhen": "平安金融中心",
+  "guangzhou": "广州塔 (小蛮腰)",
+  "suzhou": "拙政园",
+  "shaoxing": "鲁迅故里",
+  
+  "budapest": "塞切尼链桥 (Széchenyi Chain Bridge)",
+  "london": "大本钟 (Big Ben)",
+  "paris": "埃菲尔铁塔 (Eiffel Tower)",
+  "helsinki": "赫尔辛基大教堂 (Helsinki Cathedral)",
+  "madrid": "马德里王宫 (Royal Palace of Madrid)",
+  "florence": "圣母百花大教堂 (Florence Cathedral)",
+  "cardiff": "卡迪夫城堡 (Cardiff Castle)",
+  
+  "singapore": "鱼尾狮公园 (Merlion Park)",
+  "montreal": "蒙特利尔奥林匹克体育场 (Olympic Stadium)",
+  "são paulo": "保利斯塔大道 (Paulista Avenue)"
+};
+
+// 城市地标检测函数 - 用于确定城市对应的地标图标
+function getCityLandmark(cityEn, cityZh) {
+  // 转换为小写以便比较
+  const cityEnLower = (cityEn || '').toLowerCase();
+  const cityZhLower = (cityZh || '').toLowerCase();
+  
+  // 检查英文城市名中是否包含关键字
+  for (const city in landmarkIcons) {
+    // 精确匹配城市名称
+    if (cityEnLower === city || 
+        cityEnLower.includes(city) || 
+        // 处理特殊情况
+        (city === "ann arbor" && cityEnLower.includes("michigan")) ||
+        (city === "são paulo" && (cityEnLower.includes("sao paulo") || cityEnLower.includes("são paulo") || cityEnLower.includes("圣保罗")))
+       ) {
+      return {
+        icon: landmarkIcons[city],
+        color: landmarkColors[city] || "#3498db", // 默认蓝色
+        name: landmarkNames[city] || city
+      };
+    }
+  }
+  
+  // 没有找到匹配的地标，返回默认值
+  return {
+    icon: "👤",
+    color: "#3498db", // 默认蓝色
+    name: ""
+  };
+}
+
         
         // Default icon types
         const iconTypes = {
@@ -512,7 +841,7 @@
             // Group friends by school
             const friendsBySchool = {};
             filteredFriends.forEach(friend => {
-                const school = friend.school || '未填写学校';
+                const school = friend.school || ' ';
                 if (!friendsBySchool[school]) {
                     friendsBySchool[school] = [];
                 }
@@ -575,61 +904,34 @@
             return text;
         }
         
-        // Import data from Excel/CSV
-        document.getElementById('import-data').addEventListener('click', () => {
-            const fileInput = document.getElementById('file-input');
-            const file = fileInput.files[0];
+        // Export data
+        document.getElementById('export-data').addEventListener('click', () => {
+            // Convert friends array to worksheet
+            const worksheet = XLSX.utils.json_to_sheet(friends.map(friend => ({
+                '姓名': friend.name,
+                '城市（中文）': friend.cityZh || '',
+                '城市（英文）': friend.cityEn || '',
+                '国家（中文）': friend.countryZh || '',
+                '国家（英文）': friend.countryEn || '',
+                '学校/单位': friend.school || '',
+                '备注': friend.notes || ''
+            })));
             
-            if (!file) {
-                alert('请先选择一个文件');
-                return;
-            }
+            // Create workbook and add the worksheet
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '同学信息');
             
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                const data = e.target.result;
-                let processedData;
-                
-                if (file.name.endsWith('.csv')) {
-                    // Parse CSV
-                    processedData = Papa.parse(data, {
-                        header: true,
-                        skipEmptyLines: true
-                    }).data;
-                } else {
-                    // Parse Excel
-                    const workbook = XLSX.read(data, { type: 'binary' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    processedData = XLSX.utils.sheet_to_json(worksheet);
-                }
-                
-                // Process each record
-                processImportedData(processedData);
-            };
-            
-            if (file.name.endsWith('.csv')) {
-                reader.readAsText(file);
-            } else {
-                reader.readAsBinaryString(file);
-            }
+            // Generate Excel file
+            XLSX.writeFile(workbook, '2011级华文班同学信息.xlsx');
         });
         
-        // Process imported data
-        async function processImportedData(data) {
-            let successCount = 0;
-            let errorCount = 0;
+        // 处理预设数据并添加到地图
+        async function processPresetData() {
+            document.getElementById('loading-container').style.display = 'block';
+            document.getElementById('friends-container').style.display = 'none';
             
-            for (const record of data) {
-                // Check required fields
-                const name = record['姓名'] || '';
-                
-                // 处理中英文城市和国家字段
-                const cityZh = record['城市（中文）'] || '';
-                const cityEn = record['城市（英文）'] || '';
-                const countryZh = record['国家（中文）'] || '';
-                const countryEn = record['国家（英文）'] || '';
+            for (const data of presetFriendData) {
+                const { name, cityZh, cityEn, countryZh, countryEn, school, notes } = data;
                 
                 // 构建用于地理编码的位置字符串
                 let geocodeLocation = '';
@@ -659,21 +961,13 @@
                     displayLocation = geocodeLocation;
                 }
                 
-                const school = record['学校/单位'] || '';
-                const notes = record['备注'] || '';
-                
-                if (!name || !geocodeLocation) {
-                    errorCount++;
-                    continue;
-                }
-                
                 try {
                     // Geocode the location
                     const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeLocation)}`);
                     const geoData = await response.json();
                     
                     if (geoData.length === 0) {
-                        errorCount++;
+                        console.error(`无法获取位置: ${geocodeLocation}`);
                         continue;
                     }
                     
@@ -681,7 +975,7 @@
                     
                     // Create friend object
                     const newFriend = {
-                        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                        id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         name,
                         location: displayLocation,
                         cityZh,
@@ -700,97 +994,26 @@
                     // Add marker to map
                     addMarkerToMap(newFriend);
                     
-                    successCount++;
                 } catch (error) {
-                    console.error('Error processing record:', error);
-                    errorCount++;
+                    console.error(`处理同学信息时出错: ${name}`, error);
                 }
+                
+                // 为了避免请求限制，在每个请求之间等待一秒
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
-            // Save to localStorage
-            localStorage.setItem('friends', JSON.stringify(friends));
-            
-            // Update friend list
+            // 更新好友列表
             updateFriendList();
             
-            // 自动调整地图以显示所有标记
-            fitMapToAllMarkers();
-            
-            alert(`导入完成！成功: ${successCount}, 失败: ${errorCount}`);
-        }
-        
-        // Export data
-        document.getElementById('export-data').addEventListener('click', () => {
-            // Convert friends array to worksheet
-            const worksheet = XLSX.utils.json_to_sheet(friends.map(friend => ({
-                '姓名': friend.name,
-                '城市（中文）': friend.cityZh || '',
-                '城市（英文）': friend.cityEn || '',
-                '国家（中文）': friend.countryZh || '',
-                '国家（英文）': friend.countryEn || '',
-                '学校/单位': friend.school || '',
-                '备注': friend.notes || ''
-            })));
-            
-            // Create workbook and add the worksheet
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, '同学信息');
-            
-            // Generate Excel file
-            XLSX.writeFile(workbook, '2011级华文班同学信息.xlsx');
-        });
-        
-        // Download template
-        document.getElementById('download-template').addEventListener('click', () => {
-            // Create template data
-            const templateData = [
-                {
-                    '姓名': '',
-                    '城市（中文）': '',
-                    '城市（英文）': '',
-                    '国家（中文）': '',
-                    '国家（英文）': '',
-                    '学校/单位': '',
-                    '备注': ''
-                },
-            ];
-            
-            // Convert to worksheet
-            const worksheet = XLSX.utils.json_to_sheet(templateData);
-            
-            // Create workbook and add the worksheet
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, '模板');
-            
-            // Generate Excel file
-            XLSX.writeFile(workbook, '华文班信息收集模板.xlsx');
-        });
-        
-        // Clear all data
-        document.getElementById('clear-data').addEventListener('click', () => {
-            if (confirm('确定要清除所有数据吗？此操作不可恢复！')) {
-                // Clear localStorage
-                localStorage.removeItem('friends');
-                
-                // Clear friends array
-                friends = [];
-                
-                // Remove all markers from map
-                for (const id in markers) {
-                    map.removeLayer(markers[id]);
-                }
-                
-                // Reset markers object
-                Object.keys(markers).forEach(key => {
-                    delete markers[key];
-                });
-                
-                // Update friend list
-                updateFriendList();
-                
-                alert('所有数据已清除');
+            // 如果有数据，自动调整地图以显示所有标记
+            if (friends.length > 0) {
+                fitMapToAllMarkers();
             }
-        });
+            
+            // 隐藏加载动画，显示好友列表
+            document.getElementById('loading-container').style.display = 'none';
+            document.getElementById('friends-container').style.display = 'block';
+        }
         
         // Add marker to map
         function addMarkerToMap(friend) {
@@ -808,21 +1031,7 @@
             
             // 如果没有分别的城市字段，则检查完整位置字符串（兼容旧数据）
             let locationLower = (location || '').toLowerCase();
-            
-            // Check for landmark match in the location
-            for (const city in landmarkIcons) {
-                if ((cityToCheck && cityToCheck.includes(city)) || (locationLower && locationLower.includes(city))) {
-                    landmark = landmarkIcons[city];
-                    
-                    // Set special colors for specific landmarks
-                    if (city === "seattle") iconColor = "#2c3e50"; // Space Needle dark blue/gray
-                    if (city === "paris") iconColor = "#c0392b"; // Eiffel Tower red
-                    if (city === "new york") iconColor = "#27ae60"; // Statue of Liberty green
-                    if (city === "beijing" || city === "shanghai" || city === "taipei") iconColor = "#e74c3c"; // Chinese landmarks red
-                    
-                    break;
-                }
-            }
+
             
             // Use landmark if found, otherwise use selected icon type
             let iconHTML, iconSize, iconAnchor;
@@ -863,7 +1072,6 @@
                     ${school ? `<p><strong>学校/单位:</strong> ${school}</p>` : ''}
                     ${notes ? `<p><strong>备注:</strong> ${notes}</p>` : ''}
                     ${getLandmarkName(cityToCheck || locationLower) ? `<p><strong>地标:</strong> ${getLandmarkName(cityToCheck || locationLower)}</p>` : ''}
-                    <button onclick="deleteFriend('${id}')">删除</button>
                 </div>
             `;
             
@@ -920,7 +1128,7 @@
                         case "sydney": return "Opera House";
                         case "dubai": return "Burj Khalifa";
                         case "beijing": return "Forbidden City";
-                        case "shanghai": return "Oriental Pearl Tower";
+                        case "shanghai": return "东方明珠广播电视塔";
                         case "hong kong": return "Victoria Peak";
                         case "cairo": return "Pyramids";
                         case "athens": return "Parthenon";
@@ -938,38 +1146,11 @@
             return "";
         }
         
-        // Delete friend
-        window.deleteFriend = function(id) {
-            // Remove marker from map
-            map.removeLayer(markers[id]);
-            delete markers[id];
-            
-            // Remove from friends array
-            friends = friends.filter(friend => friend.id !== id);
-            localStorage.setItem('friends', JSON.stringify(friends));
-            
-            // Update friend list
-            updateFriendList();
-        };
+        // 添加"显示全部"按钮到地图
+        map.addControl(new showAllControl());
         
-        // Load existing friends on page load
-        function loadFriends() {
-            friends.forEach(friend => {
-                addMarkerToMap(friend);
-            });
-            updateFriendList();
-            
-            // 添加"显示全部"按钮到地图
-            map.addControl(new showAllControl());
-            
-            // 如果有数据，自动调整地图以显示所有标记
-            if (friends.length > 0) {
-                fitMapToAllMarkers();
-            }
-        }
-        
-        // Load friends when page loads
-        window.addEventListener('load', loadFriends);
+        // 页面加载时处理预设数据
+        window.addEventListener('load', processPresetData);
 
         // 添加控制台错误监听，方便调试
         window.addEventListener('error', function(e) {
