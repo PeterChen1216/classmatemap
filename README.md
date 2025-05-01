@@ -28,7 +28,6 @@ This is the **CengFan Map** web application, created by "Peter Chen" - students 
   - HTML5  
   - [OpenStreetMap.org](https://www.openstreetmap.org)  
 
----
 
 # 蹭饭地图 (网页版)
 
