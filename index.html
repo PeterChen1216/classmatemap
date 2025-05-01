@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Friends Around the World</title>
+    <title>2011级华文班联络图</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <style>
@@ -159,38 +159,38 @@
     <div id="map"></div>
     
     <div class="control-panel">
-        <h3>My Friends Around The World</h3>
+        <h3>2011级华文班联络图</h3>
         
         <div class="tab-buttons">
-            <button class="tab-button active" data-tab="add">Add Friend</button>
-            <button class="tab-button" data-tab="list">Friend List</button>
-            <button class="tab-button" data-tab="search">Search</button>
+            <button class="tab-button active" data-tab="add">添加</button>
+            <button class="tab-button" data-tab="list">列表</button>
+            <button class="tab-button" data-tab="search">检索</button>
         </div>
         
         <div class="tab-content" id="add-tab">
             <div class="friend-form">
-                <input type="text" id="friend-name" placeholder="Name 姓名">
-                <input type="text" id="location-name" placeholder="Location Name (请用中文输入‘城市，国家’)">
-                <input type="text" id="school" placeholder="School 学校 (中英都可）">
-                <textarea id="notes" placeholder="Additional Notes 标识备注"></textarea>
-                <button id="add-friend">Add to Map 加入地图</button>
+                <input type="text" id="friend-name" placeholder="姓名">
+                <input type="text" id="location-name" placeholder="地点：(城市，国家)">
+                <input type="text" id="school" placeholder="大学，学校，单位">
+                <textarea id="notes" placeholder="备注"></textarea>
+                <button id="add-friend">添加到地图</button>
             </div>
         </div>
         
         <div class="tab-content" id="list-tab">
             <div class="friend-list" id="friends-container">
                 <!-- Friend list will be populated here -->
-                <div class="friend-item">No friends added yet</div>
+                <div class="friend-item">尚未添加</div>
             </div>
         </div>
         
         <div class="tab-content" id="search-tab">
             <div class="search-form">
-                <input type="text" id="search-query" placeholder="Search by City or Country (用中文检索，城市/国家）">
+                <input type="text" id="search-query" placeholder="检索：城市/国家">
                 <button id="search-button">Search</button>
                 <div class="search-results" id="search-results">
                     <!-- Search results will appear here -->
-                    <p>输入城市/国家名字来检索</p>
+                    <p>通过输入城市/国家来检索</p>
                 </div>
             </div>
         </div>
@@ -234,14 +234,6 @@
             "las vegas": "🎰",  // Casino
             "moscow": "🏰",  // Kremlin
             "taipei": "🏙️"   // Taipei 101
-        };
-        
-        // Icon types (fallback for cities without landmarks)
-        const iconTypes = {
-            school: { color: '#4287f5', icon: '🏫' },
-            home: { color: '#f54242', icon: '🏠' },
-            work: { color: '#42f587', icon: '💼' },
-            travel: { color: '#f5a742', icon: '✈️' }
         };
         
         // Initialize tabs
