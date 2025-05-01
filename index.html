@@ -404,13 +404,9 @@
                     document.getElementById('school').value = '';
                     document.getElementById('notes').value = '';
                     
-                    // Show success message
-                    alert(`Friend "${name}" in ${location} added successfully!`);
+                    // Switch to list tab
+                    document.querySelector('[data-tab="list"]').click();
                 })
-                .catch(error => {
-                    console.error('Error geocoding location:', error);
-                    alert('Error finding location. Please try again.');
-                });
                 .catch(error => {
                     console.error('Error geocoding location:', error);
                     alert('Error finding location. Please try again.');
