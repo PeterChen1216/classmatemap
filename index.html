@@ -70,9 +70,64 @@
         .popup-content {
             text-align: center;
         }
-        .popup-content img {
-            max-width: 100%;
+        .search-form input {
+            width: 100%;
             margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .search-form button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .search-form button:hover {
+            background: #45a049;
+        }
+        
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .search-result-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .search-result-item h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        
+        .search-result-item p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .highlight {
+            background-color: #fffacd;
+            font-weight: bold;
         }
         h3 {
             margin: 0 0 10px 0;
@@ -109,9 +164,10 @@
         <div class="tab-buttons">
             <button class="tab-button active" data-tab="add">Add Friend</button>
             <button class="tab-button" data-tab="list">Friend List</button>
+            <button class="tab-button" data-tab="search">Search</button>
         </div>
         
-        <div class="tab-content active" id="add-tab">
+        <div class="tab-content" id="add-tab">
             <div class="friend-form">
                 <input type="text" id="friend-name" placeholder="Friend's Name">
                 <input type="text" id="location-name" placeholder="Location Name (e.g., City, Country)">
@@ -131,6 +187,17 @@
             <div class="friend-list" id="friends-container">
                 <!-- Friend list will be populated here -->
                 <div class="friend-item">No friends added yet</div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="search-tab">
+            <div class="search-form">
+                <input type="text" id="search-query" placeholder="Search by City or Country">
+                <button id="search-button">Search</button>
+                <div class="search-results" id="search-results">
+                    <!-- Search results will appear here -->
+                    <p>Enter a city or country to find your friends.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -192,9 +259,99 @@
                 
                 // Add active class to clicked button and corresponding tab
                 button.classList.add('active');
-                document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+                const tabId = `${button.dataset.tab}-tab`;
+                document.getElementById(tabId).classList.add('active');
             });
         });
+        
+        // Search functionality
+        document.getElementById('search-button').addEventListener('click', performSearch);
+        document.getElementById('search-query').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+        
+        function performSearch() {
+            const query = document.getElementById('search-query').value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('search-results');
+            
+            if (!query) {
+                resultsContainer.innerHTML = '<p>Please enter a city or country to search.</p>';
+                return;
+            }
+            
+            // Filter friends based on query
+            const filteredFriends = friends.filter(friend => 
+                friend.location.toLowerCase().includes(query)
+            );
+            
+            if (filteredFriends.length === 0) {
+                resultsContainer.innerHTML = '<p>No friends found in this location.</p>';
+                return;
+            }
+            
+            // Group friends by school
+            const friendsBySchool = {};
+            filteredFriends.forEach(friend => {
+                const school = friend.school || 'No School Listed';
+                if (!friendsBySchool[school]) {
+                    friendsBySchool[school] = [];
+                }
+                friendsBySchool[school].push(friend);
+            });
+            
+            // Display results
+            let resultsHTML = `<h4>Found ${filteredFriends.length} friend(s) in "${query}"</h4>`;
+            
+            // List of schools
+            resultsHTML += '<h4>By School/University:</h4>';
+            
+            for (const school in friendsBySchool) {
+                resultsHTML += `<div class="search-result-school">
+                    <h4>${school}</h4>
+                    <ul>`;
+                
+                friendsBySchool[school].forEach(friend => {
+                    resultsHTML += `<li class="search-result-item" data-id="${friend.id}">
+                        <strong>${friend.name}</strong> - ${highlightText(friend.location, query)}
+                    </li>`;
+                });
+                
+                resultsHTML += `</ul></div>`;
+            }
+            
+            resultsContainer.innerHTML = resultsHTML;
+            
+            // Add click event to result items
+            document.querySelectorAll('.search-result-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const friendId = item.dataset.id;
+                    const friend = friends.find(f => f.id === friendId);
+                    
+                    if (friend && markers[friendId]) {
+                        // Center map on friend and open popup
+                        map.setView(friend.coordinates, 12);
+                        markers[friendId].openPopup();
+                    }
+                });
+            });
+        }
+        
+        // Helper function to highlight search term in text
+        function highlightText(text, query) {
+            const lowerText = text.toLowerCase();
+            const index = lowerText.indexOf(query.toLowerCase());
+            
+            if (index >= 0) {
+                const before = text.substring(0, index);
+                const match = text.substring(index, index + query.length);
+                const after = text.substring(index + query.length);
+                return `${before}<span class="highlight">${match}</span>${after}`;
+            }
+            
+            return text;
+        }
         
         // Add friend functionality
         document.getElementById('add-friend').addEventListener('click', () => {
@@ -247,9 +404,13 @@
                     document.getElementById('school').value = '';
                     document.getElementById('notes').value = '';
                     
-                    // Switch to list tab
-                    document.querySelector('[data-tab="list"]').click();
+                    // Show success message
+                    alert(`Friend "${name}" in ${location} added successfully!`);
                 })
+                .catch(error => {
+                    console.error('Error geocoding location:', error);
+                    alert('Error finding location. Please try again.');
+                });
                 .catch(error => {
                     console.error('Error geocoding location:', error);
                     alert('Error finding location. Please try again.');
