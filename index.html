@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Friends Around the World</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 350px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .friend-form input, .friend-form select, .friend-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .friend-form button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .friend-form button:hover {
+            background: #45a049;
+        }
+        .friend-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .friend-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .friend-item:hover {
+            background: #f5f5f5;
+        }
+        .custom-icon {
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+            font-size: 24px;
+            z-index: 1000;
+        }
+        .popup-content {
+            text-align: center;
+        }
+        .popup-content img {
+            max-width: 100%;
+            margin-bottom: 10px;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+        }
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .tab-button {
+            flex: 1;
+            padding: 8px;
+            background: #f1f1f1;
+            border: none;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="control-panel">
+        <h3>My Friends Around The World</h3>
+        
+        <div class="tab-buttons">
+            <button class="tab-button active" data-tab="add">Add Friend</button>
+            <button class="tab-button" data-tab="list">Friend List</button>
+        </div>
+        
+        <div class="tab-content active" id="add-tab">
+            <div class="friend-form">
+                <input type="text" id="friend-name" placeholder="Friend's Name">
+                <input type="text" id="location-name" placeholder="Location Name (e.g., City, Country)">
+                <input type="text" id="school" placeholder="School/University">
+                <select id="icon-type">
+                    <option value="school">School</option>
+                    <option value="home">Home</option>
+                    <option value="work">Work</option>
+                    <option value="travel">Travel</option>
+                </select>
+                <textarea id="notes" placeholder="Additional Notes"></textarea>
+                <button id="add-friend">Add to Map</button>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="list-tab">
+            <div class="friend-list" id="friends-container">
+                <!-- Friend list will be populated here -->
+                <div class="friend-item">No friends added yet</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([30, 110], 3);
+        
+        // Add the base map layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Ensure Taiwan is shown as part of China by adding custom overlay
+        // This ensures the map follows the One-China policy
+        
+        // Friend data storage
+        let friends = JSON.parse(localStorage.getItem('friends') || '[]');
+        const markers = {};
+        
+        // Famous landmark icons for major cities
+        const landmarkIcons = {
+            "seattle": "🏙️",  // Space Needle
+            "paris": "🗼",  // Eiffel Tower
+            "new york": "🗽",  // Statue of Liberty
+            "london": "⏰",  // Big Ben
+            "rome": "🏛️",  // Colosseum
+            "tokyo": "🗼",  // Tokyo Tower
+            "sydney": "🏛️",  // Opera House
+            "dubai": "🏙️",  // Burj Khalifa
+            "beijing": "🏯",  // Forbidden City
+            "shanghai": "🏙️",  // Oriental Pearl
+            "hong kong": "🏙️",  // Victoria Peak
+            "cairo": "🔺",  // Pyramids
+            "athens": "🏛️",  // Parthenon
+            "rio": "🗿",  // Christ the Redeemer
+            "san francisco": "🌉",  // Golden Gate
+            "venice": "⛵",  // Gondola
+            "barcelona": "⛪",  // Sagrada Familia
+            "las vegas": "🎰",  // Casino
+            "moscow": "🏰",  // Kremlin
+            "taipei": "🏙️"   // Taipei 101
+        };
+        
+        // Icon types (fallback for cities without landmarks)
+        const iconTypes = {
+            school: { color: '#4287f5', icon: '🏫' },
+            home: { color: '#f54242', icon: '🏠' },
+            work: { color: '#42f587', icon: '💼' },
+            travel: { color: '#f5a742', icon: '✈️' }
+        };
+        
+        // Initialize tabs
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and tabs
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding tab
+                button.classList.add('active');
+                document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+            });
+        });
+        
+        // Add friend functionality
+        document.getElementById('add-friend').addEventListener('click', () => {
+            const name = document.getElementById('friend-name').value.trim();
+            const location = document.getElementById('location-name').value.trim();
+            const school = document.getElementById('school').value.trim();
+            const iconType = document.getElementById('icon-type').value;
+            const notes = document.getElementById('notes').value.trim();
+            
+            if (!name || !location) {
+                alert('Please enter a name and location');
+                return;
+            }
+            
+            // Use Nominatim to geocode the location
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert('Location not found. Please try a different name.');
+                        return;
+                    }
+                    
+                    const coordinates = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                    
+                    // Create a new friend object
+                    const newFriend = {
+                        id: Date.now().toString(),
+                        name,
+                        location,
+                        school,
+                        iconType,
+                        notes,
+                        coordinates
+                    };
+                    
+                    // Add to friends array and save to localStorage
+                    friends.push(newFriend);
+                    localStorage.setItem('friends', JSON.stringify(friends));
+                    
+                    // Add marker to map
+                    addMarkerToMap(newFriend);
+                    
+                    // Update friend list
+                    updateFriendList();
+                    
+                    // Clear form fields
+                    document.getElementById('friend-name').value = '';
+                    document.getElementById('location-name').value = '';
+                    document.getElementById('school').value = '';
+                    document.getElementById('notes').value = '';
+                    
+                    // Switch to list tab
+                    document.querySelector('[data-tab="list"]').click();
+                })
+                .catch(error => {
+                    console.error('Error geocoding location:', error);
+                    alert('Error finding location. Please try again.');
+                });
+        });
+        
+        // Add marker to map
+        function addMarkerToMap(friend) {
+            const { id, name, location, school, iconType, notes, coordinates } = friend;
+            
+            // Check if the location contains a famous landmark city
+            let landmark = null;
+            let iconColor = "#3498db";
+            let locationLower = location.toLowerCase();
+            
+            // Check for landmark match in the location
+            for (const city in landmarkIcons) {
+                if (locationLower.includes(city)) {
+                    landmark = landmarkIcons[city];
+                    
+                    // Set special colors for specific landmarks
+                    if (city === "seattle") iconColor = "#2c3e50"; // Space Needle dark blue/gray
+                    if (city === "paris") iconColor = "#c0392b"; // Eiffel Tower red
+                    if (city === "new york") iconColor = "#27ae60"; // Statue of Liberty green
+                    if (city === "beijing" || city === "shanghai" || city === "taipei") iconColor = "#e74c3c"; // Chinese landmarks red
+                    
+                    break;
+                }
+            }
+            
+            // Use landmark if found, otherwise use selected icon type
+            let iconHTML, iconSize, iconAnchor;
+            
+            if (landmark) {
+                // Use landmark icon (larger)
+                iconHTML = `<div style="background-color: ${iconColor}; width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 36px;">${landmark}</div>`;
+                iconSize = [60, 60];
+                iconAnchor = [30, 30];
+            } else {
+                // Use default icon type
+                const { color, icon } = iconTypes[iconType];
+                iconHTML = `<div style="background-color: ${color}; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">${icon}</div>`;
+                iconSize = [40, 40];
+                iconAnchor = [20, 20];
+            }
+            
+            // Create custom icon
+            const customIcon = L.divIcon({
+                className: 'custom-icon',
+                html: iconHTML,
+                iconSize: iconSize,
+                iconAnchor: iconAnchor
+            });
+            
+            // Create marker
+            const marker = L.marker(coordinates, { icon: customIcon }).addTo(map);
+            
+                // Create popup content with landmark name
+                const popupContent = `
+                    <div class="popup-content">
+                        <h3>${name}</h3>
+                        <p><strong>Location:</strong> ${location}</p>
+                        ${school ? `<p><strong>School:</strong> ${school}</p>` : ''}
+                        ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+                        ${getLandmarkName(locationLower) ? `<p><strong>Landmark:</strong> ${getLandmarkName(locationLower)}</p>` : ''}
+                        <button onclick="deleteFriend('${id}')">Delete</button>
+                    </div>
+                `;
+            
+            marker.bindPopup(popupContent);
+            markers[id] = marker;
+        }
+        
+        // Update friend list
+        function updateFriendList() {
+            const container = document.getElementById('friends-container');
+            
+            if (friends.length === 0) {
+                container.innerHTML = '<div class="friend-item">No friends added yet</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            friends.forEach(friend => {
+                const item = document.createElement('div');
+                item.className = 'friend-item';
+                item.textContent = `${friend.name} - ${friend.location}`;
+                item.addEventListener('click', () => {
+                    map.setView(friend.coordinates, 12);
+                    markers[friend.id].openPopup();
+                });
+                container.appendChild(item);
+            });
+        }
+        
+        // Function to get landmark name from location
+        function getLandmarkName(locationLower) {
+            for (const city in landmarkIcons) {
+                if (locationLower.includes(city)) {
+                    switch(city) {
+                        case "seattle": return "Space Needle";
+                        case "paris": return "Eiffel Tower";
+                        case "new york": return "Statue of Liberty";
+                        case "london": return "Big Ben";
+                        case "rome": return "Colosseum";
+                        case "tokyo": return "Tokyo Tower";
+                        case "sydney": return "Opera House";
+                        case "dubai": return "Burj Khalifa";
+                        case "beijing": return "Forbidden City";
+                        case "shanghai": return "Oriental Pearl Tower";
+                        case "hong kong": return "Victoria Peak";
+                        case "cairo": return "Pyramids";
+                        case "athens": return "Parthenon";
+                        case "rio": return "Christ the Redeemer";
+                        case "san francisco": return "Golden Gate Bridge";
+                        case "venice": return "Gondola";
+                        case "barcelona": return "Sagrada Familia";
+                        case "las vegas": return "Casino";
+                        case "moscow": return "Kremlin";
+                        case "taipei": return "Taipei 101";
+                        default: return "";
+                    }
+                }
+            }
+            return "";
+        }
+        
+        // Delete friend
+        window.deleteFriend = function(id) {
+            // Remove marker from map
+            map.removeLayer(markers[id]);
+            delete markers[id];
+            
+            // Remove from friends array
+            friends = friends.filter(friend => friend.id !== id);
+            localStorage.setItem('friends', JSON.stringify(friends));
+            
+            // Update friend list
+            updateFriendList();
+        };
+        
+        // Load existing friends on page load
+        function loadFriends() {
+            friends.forEach(friend => {
+                addMarkerToMap(friend);
+            });
+            updateFriendList();
+        }
+    </script>
+</body>
+</html>
