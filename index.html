@@ -184,6 +184,19 @@
         #export-data:hover {
             background: #2980b9;
         }
+        .show-all-btn {
+            width: 100%;
+            margin-top: 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .show-all-btn:hover {
+            background: #2980b9;
+        }
     </style>
 </head>
 <body>
@@ -218,6 +231,7 @@
                 <!-- Friend list will be populated here -->
                 <div class="friend-item">尚未添加</div>
             </div>
+            <button id="show-all-friends" class="show-all-btn">显示所有同学</button>
             <button id="clear-data" style="margin-top: 15px; width: 100%; background: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">清除所有数据</button>
         </div>
         
@@ -230,6 +244,7 @@
                     <!-- Search results will appear here -->
                     <p>通过输入城市/国家来检索（支持中英文）</p>
                 </div>
+                <button id="search-show-all" class="show-all-btn">显示所有同学</button>
             </div>
         </div>
     </div>
@@ -366,7 +381,51 @@
             "default": { color: "#3498db", icon: "👤" }
         };
         
-        // Initialize tabs
+        // 添加显示所有好友的按钮监听
+        document.getElementById('show-all-friends').addEventListener('click', fitMapToAllMarkers);
+        document.getElementById('search-show-all').addEventListener('click', fitMapToAllMarkers);
+        
+        // 调整地图视图以显示所有标记
+        function fitMapToAllMarkers() {
+            // 如果没有标记，不进行任何操作
+            if (Object.keys(markers).length === 0) {
+                return;
+            }
+            
+            // 创建一个包含所有标记的边界
+            const bounds = L.latLngBounds(Object.values(markers).map(marker => marker.getLatLng()));
+            
+            // 调整地图视图以适应所有标记
+            map.fitBounds(bounds, {
+                padding: [50, 50], // 添加一些内边距
+                maxZoom: 12,       // 限制最大缩放级别
+                animate: true      // 使用动画
+            });
+        }
+        
+        // 添加"显示全部"按钮到地图上
+        const showAllControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            
+            onAdd: function(map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                container.innerHTML = `
+                    <a href="#" title="显示所有好友" style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; background-color: white; font-size: 18px;">👥</a>
+                `;
+                
+                L.DomEvent.on(container, 'click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+                    fitMapToAllMarkers();
+                });
+                
+                return container;
+            }
+        });
+        
+        // 初始化tabs
         document.querySelectorAll('.tab-button').forEach(button => {
             button.addEventListener('click', () => {
                 // Remove active class from all buttons and tabs
@@ -654,6 +713,9 @@
             // Update friend list
             updateFriendList();
             
+            // 自动调整地图以显示所有标记
+            fitMapToAllMarkers();
+            
             alert(`导入完成！成功: ${successCount}, 失败: ${errorCount}`);
         }
         
@@ -896,6 +958,14 @@
                 addMarkerToMap(friend);
             });
             updateFriendList();
+            
+            // 添加"显示全部"按钮到地图
+            map.addControl(new showAllControl());
+            
+            // 如果有数据，自动调整地图以显示所有标记
+            if (friends.length > 0) {
+                fitMapToAllMarkers();
+            }
         }
         
         // Load friends when page loads
