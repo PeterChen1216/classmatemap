@@ -704,6 +704,45 @@ function getCityLandmark(cityEn, cityZh) {
   };
 }
 
+// 创建城市位置键 - 用于对同一城市的同学进行分组
+function createLocationKey(friend) {
+    // 使用城市+国家作为位置键
+    let cityKey = '';
+    let countryKey = '';
+    
+    // 优先使用英文城市名和国家名（更标准化）
+    if (friend.cityEn) {
+        cityKey = friend.cityEn.toLowerCase();
+    } else if (friend.cityZh) {
+        cityKey = friend.cityZh.toLowerCase();
+    }
+    
+    if (friend.countryEn) {
+        countryKey = friend.countryEn.toLowerCase();
+    } else if (friend.countryZh) {
+        countryKey = friend.countryZh.toLowerCase();
+    }
+    
+    // 返回组合键
+    return `${cityKey}_${countryKey}`;
+}
+
+// 获取位置显示名称
+function getLocationDisplayName(friend) {
+    const { cityZh, cityEn, countryZh, countryEn, location } = friend;
+    
+    // 优先使用中文城市和国家名
+    if (cityZh && countryZh) {
+        return `${cityZh}, ${countryZh}`;
+    } else if (cityEn && countryEn) {
+        return `${cityEn}, ${countryEn}`;
+    } else if (cityZh || cityEn) {
+        return [cityZh, cityEn].filter(Boolean).join('/');
+    } else {
+        return location || '未知位置';
+    }
+}
+
         
         // Default icon types
         const iconTypes = {
@@ -835,37 +874,57 @@ function getCityLandmark(cityEn, cityZh) {
             // Display results
             let resultsHTML = `<h4>在"${displayQuery}"中找到 ${filteredFriends.length} 位同学</h4>`;
             
-            // List of schools
-            resultsHTML += '<h4>按学校/单位:</h4>';
+            // Group friends by location and school
+            const friendsByLocation = {};
             
-            // Group friends by school
-            const friendsBySchool = {};
             filteredFriends.forEach(friend => {
-                const school = friend.school || ' ';
-                if (!friendsBySchool[school]) {
-                    friendsBySchool[school] = [];
+                // 使用完整位置作为键
+                const locationKey = createLocationKey(friend);
+                if (!friendsByLocation[locationKey]) {
+                    friendsByLocation[locationKey] = [];
                 }
-                friendsBySchool[school].push(friend);
+                friendsByLocation[locationKey].push(friend);
             });
             
-            for (const school in friendsBySchool) {
-                resultsHTML += `<div class="search-result-school">
-                    <h4>${school}</h4>
+            // Display results grouped by location
+            for (const locationKey in friendsByLocation) {
+                const locationFriends = friendsByLocation[locationKey];
+                if (locationFriends.length === 0) continue;
+                
+                // Get display location from first friend
+                const firstFriend = locationFriends[0];
+                const locationName = getLocationDisplayName(firstFriend);
+                
+                resultsHTML += `<div class="search-result-location">
+                    <h4>${locationName} (${locationFriends.length}人)</h4>
                     <ul>`;
                 
-                friendsBySchool[school].forEach(friend => {
-                    // 确定要在结果中显示的位置信息
-                    let displayLocation = friend.location;
-                    if (!displayLocation && (friend.cityZh || friend.cityEn || friend.countryZh || friend.countryEn)) {
-                        const city = friend.cityZh || friend.cityEn || '';
-                        const country = friend.countryZh || friend.countryEn || '';
-                        displayLocation = city + (city && country ? ', ' : '') + country;
+                // Group further by school
+                const schoolGroups = {};
+                locationFriends.forEach(friend => {
+                    const school = friend.school || '(未填写学校)';
+                    if (!schoolGroups[school]) {
+                        schoolGroups[school] = [];
                     }
-                    
-                    resultsHTML += `<li class="search-result-item" data-id="${friend.id}">
-                        <strong>${friend.name}</strong> - ${highlightText(displayLocation, query)}
-                    </li>`;
+                    schoolGroups[school].push(friend);
                 });
+                
+                for (const school in schoolGroups) {
+                    const schoolFriends = schoolGroups[school];
+                    
+                    resultsHTML += `<div class="search-result-school">
+                        <h5>${school}</h5>
+                        <ul>`;
+                    
+                    schoolFriends.forEach(friend => {
+                        resultsHTML += `
+                            <li class="search-result-item" data-location-id="${friend.locationId || ''}">
+                                <strong>${friend.name}</strong>
+                            </li>`;
+                    });
+                    
+                    resultsHTML += `</ul></div>`;
+                }
                 
                 resultsHTML += `</ul></div>`;
             }
@@ -875,13 +934,14 @@ function getCityLandmark(cityEn, cityZh) {
             // Add click event to result items
             document.querySelectorAll('.search-result-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const friendId = item.dataset.id;
-                    const friend = friends.find(f => f.id === friendId);
+                    const locationId = item.dataset.locationId;
                     
-                    if (friend && markers[friendId]) {
-                        // Center map on friend and open popup
-                        map.setView(friend.coordinates, 12);
-                        markers[friendId].openPopup();
+                    if (locationId && markers[locationId]) {
+                        // 获取相关标记位置
+                        const marker = markers[locationId];
+                        // 居中显示并打开弹窗
+                        map.setView(marker.getLatLng(), 12);
+                        marker.openPopup();
                     }
                 });
             });
@@ -926,158 +986,223 @@ function getCityLandmark(cityEn, cityZh) {
         });
         
         // 处理预设数据并添加到地图
-        async function processPresetData() {
-            document.getElementById('loading-container').style.display = 'block';
-            document.getElementById('friends-container').style.display = 'none';
+    async function processPresetData() {
+        document.getElementById('loading-container').style.display = 'block';
+        document.getElementById('friends-container').style.display = 'none';
+        
+        // 用于按位置分组的数据结构
+        const locationGroups = {};
+        
+        for (const data of presetFriendData) {
+            const { name, cityZh, cityEn, countryZh, countryEn, school, notes } = data;
             
-            for (const data of presetFriendData) {
-                const { name, cityZh, cityEn, countryZh, countryEn, school, notes } = data;
+            // 构建用于地理编码的位置字符串
+            let geocodeLocation = '';
+            
+            // 优先使用英文进行地理编码，因为OpenStreetMap的API更好地支持英文
+            if (cityEn && countryEn) {
+                geocodeLocation = `${cityEn}, ${countryEn}`;
+            } else if (cityZh && countryZh) {
+                geocodeLocation = `${cityZh}, ${countryZh}`;
+            } else if (cityEn) {
+                geocodeLocation = cityEn;
+            } else if (cityZh) {
+                geocodeLocation = cityZh;
+            }
+            
+            // 构建用于显示的位置字符串（同时显示中英文）
+            let displayLocation = '';
+            if (cityZh && cityEn && countryZh && countryEn) {
+                displayLocation = `${cityZh}/${cityEn}, ${countryZh}/${countryEn}`;
+            } else if (cityZh && countryZh) {
+                displayLocation = `${cityZh}, ${countryZh}`;
+            } else if (cityEn && countryEn) {
+                displayLocation = `${cityEn}, ${countryEn}`;
+            } else if (cityZh || cityEn) {
+                displayLocation = [cityZh, cityEn].filter(Boolean).join('/');
+            } else {
+                displayLocation = geocodeLocation;
+            }
+            
+            try {
+                // Geocode the location
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeLocation)}`);
+                const geoData = await response.json();
                 
-                // 构建用于地理编码的位置字符串
-                let geocodeLocation = '';
-                
-                // 优先使用英文进行地理编码，因为OpenStreetMap的API更好地支持英文
-                if (cityEn && countryEn) {
-                    geocodeLocation = `${cityEn}, ${countryEn}`;
-                } else if (cityZh && countryZh) {
-                    geocodeLocation = `${cityZh}, ${countryZh}`;
-                } else if (cityEn) {
-                    geocodeLocation = cityEn;
-                } else if (cityZh) {
-                    geocodeLocation = cityZh;
+                if (geoData.length === 0) {
+                    console.error(`无法获取位置: ${geocodeLocation}`);
+                    continue;
                 }
                 
-                // 构建用于显示的位置字符串（同时显示中英文）
-                let displayLocation = '';
-                if (cityZh && cityEn && countryZh && countryEn) {
-                    displayLocation = `${cityZh}/${cityEn}, ${countryZh}/${countryEn}`;
-                } else if (cityZh && countryZh) {
-                    displayLocation = `${cityZh}, ${countryZh}`;
-                } else if (cityEn && countryEn) {
-                    displayLocation = `${cityEn}, ${countryEn}`;
-                } else if (cityZh || cityEn) {
-                    displayLocation = [cityZh, cityEn].filter(Boolean).join('/');
-                } else {
-                    displayLocation = geocodeLocation;
-                }
+                const coordinates = [parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)];
                 
-                try {
-                    // Geocode the location
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeLocation)}`);
-                    const geoData = await response.json();
-                    
-                    if (geoData.length === 0) {
-                        console.error(`无法获取位置: ${geocodeLocation}`);
-                        continue;
-                    }
-                    
-                    const coordinates = [parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)];
-                    
-                    // Create friend object
-                    const newFriend = {
-                        id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                        name,
-                        location: displayLocation,
-                        cityZh,
-                        cityEn,
-                        countryZh, 
-                        countryEn,
-                        school,
-                        notes,
-                        coordinates,
-                        iconType: 'default'
+                // Create friend object
+                const newFriend = {
+                    id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    name,
+                    location: displayLocation,
+                    cityZh,
+                    cityEn,
+                    countryZh, 
+                    countryEn,
+                    school,
+                    notes,
+                    coordinates,
+                    iconType: 'default'
+                };
+                
+                // Add to friends array
+                friends.push(newFriend);
+                
+                // 创建位置键用于分组
+                const locationKey = createLocationKey(newFriend);
+                
+                // 添加到位置分组
+                if (!locationGroups[locationKey]) {
+                    locationGroups[locationKey] = {
+                        friends: [],
+                        coordinates: coordinates,
+                        displayName: displayLocation
                     };
-                    
-                    // Add to friends array
-                    friends.push(newFriend);
-                    
-                    // Add marker to map
-                    addMarkerToMap(newFriend);
-                    
-                } catch (error) {
-                    console.error(`处理同学信息时出错: ${name}`, error);
                 }
                 
-                // 为了避免请求限制，在每个请求之间等待一秒
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                locationGroups[locationKey].friends.push(newFriend);
+                
+            } catch (error) {
+                console.error(`处理同学信息时出错: ${name}`, error);
             }
             
-            // 更新好友列表
-            updateFriendList();
-            
-            // 如果有数据，自动调整地图以显示所有标记
-            if (friends.length > 0) {
-                fitMapToAllMarkers();
-            }
-            
-            // 隐藏加载动画，显示好友列表
-            document.getElementById('loading-container').style.display = 'none';
-            document.getElementById('friends-container').style.display = 'block';
+            // 为了避免请求限制，在每个请求之间等待一秒
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
-        // Add marker to map
-        function addMarkerToMap(friend) {
-            const { id, name, location, cityZh, cityEn, countryZh, countryEn, school, notes, coordinates } = friend;
+        // 为每个位置组创建标记
+        for (const locationKey in locationGroups) {
+            addGroupMarker(locationGroups[locationKey]);
+        }
+        
+        // 更新好友列表
+        updateFriendList();
+        
+        // 如果有数据，自动调整地图以显示所有标记
+        if (Object.keys(markers).length > 0) {
+            fitMapToAllMarkers();
+        }
+        
+        // 隐藏加载动画，显示好友列表
+        document.getElementById('loading-container').style.display = 'none';
+        document.getElementById('friends-container').style.display = 'block';
+    }
+        
+        // 为位置组添加标记
+        function addGroupMarker(locationGroup) {
+            const friends = locationGroup.friends;
+            const coordinates = locationGroup.coordinates;
             
-            // Check if the location contains a famous landmark city
-            let landmark = null;
-            let iconColor = "#3498db";
+            if (!friends || friends.length === 0) return;
             
-            // 优先使用英文城市名检查地标
+            // 获取第一个同学信息用于地标和颜色
+            const firstFriend = friends[0];
+            const { cityZh, cityEn } = firstFriend;
+            
+            // 检查是否有城市地标
             let cityToCheck = (cityEn || '').toLowerCase();
             if (!cityToCheck) {
                 cityToCheck = (cityZh || '').toLowerCase();
             }
             
-            // 如果没有分别的城市字段，则检查完整位置字符串（兼容旧数据）
-            let locationLower = (location || '').toLowerCase();
-
+            // 获取地标信息
+            const landmark = getCityLandmark(cityEn, cityZh);
             
-            // Use landmark if found, otherwise use selected icon type
+            // 根据该位置的同学数量决定图标样式
             let iconHTML, iconSize, iconAnchor;
             
-            if (landmark) {
-                // Use landmark icon (larger)
-                iconHTML = `<div style="background-color: ${iconColor}; width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 36px;">${landmark}</div>`;
-                iconSize = [60, 60];
-                iconAnchor = [30, 30];
+            if (friends.length > 1) {
+                // 多人标记 - 显示人数
+                iconHTML = `
+                    <div class="multi-person-icon" style="background-color: ${landmark.color}; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                        ${landmark.icon}
+                        <div class="multi-person-count">${friends.length}</div>
+                    </div>
+                `;
+                iconSize = [50, 50];
+                iconAnchor = [25, 25];
             } else {
-                // Use default icon type
-                const { color, icon } = iconTypes['default'];
-                iconHTML = `<div style="background-color: ${color}; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">${icon}</div>`;
+                // 单人标记
+                iconHTML = `<div style="background-color: ${landmark.color}; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">${landmark.icon}</div>`;
                 iconSize = [40, 40];
                 iconAnchor = [20, 20];
             }
             
-            // Create custom icon
+            // 创建地图标记图标
             const customIcon = L.divIcon({
                 className: 'custom-icon',
                 html: iconHTML,
                 iconSize: iconSize,
                 iconAnchor: iconAnchor
             });
-            
-            // Create marker
-            const marker = L.marker(coordinates, { icon: customIcon }).addTo(map);
-            
-            // 显示城市和国家（优先使用中文）
-            const displayCity = cityZh || cityEn || '';
-            const displayCountry = countryZh || countryEn || '';
-            
-            // Create popup content with landmark name
-            const popupContent = `
-                <div class="popup-content">
-                    <h3>${name}</h3>
-                    <p><strong>地点:</strong> ${location}</p>
-                    ${school ? `<p><strong>学校/单位:</strong> ${school}</p>` : ''}
-                    ${notes ? `<p><strong>备注:</strong> ${notes}</p>` : ''}
-                    ${getLandmarkName(cityToCheck || locationLower) ? `<p><strong>地标:</strong> ${getLandmarkName(cityToCheck || locationLower)}</p>` : ''}
+    
+    // 创建标记并添加到地图
+    const marker = L.marker(coordinates, { icon: customIcon }).addTo(map);
+    
+    // 创建组弹窗内容
+    let popupContent = '';
+    
+    if (friends.length > 1) {
+        // 多人位置 - 显示所有同学信息
+        const locationName = getLocationDisplayName(firstFriend);
+        
+        popupContent = `
+            <div class="group-popup">
+                <h3>${locationName} - ${friends.length}位同学</h3>
+                <div class="group-popup-list">
+        `;
+        
+        // 添加每个同学的信息
+        friends.forEach(friend => {
+            popupContent += `
+                <div class="group-popup-item">
+                    <h4>${friend.name}</h4>
+                    ${friend.school ? `<p><strong>学校/单位:</strong> ${friend.school}</p>` : ''}
+                    ${friend.notes ? `<p><strong>备注:</strong> ${friend.notes}</p>` : ''}
                 </div>
             `;
-            
-            marker.bindPopup(popupContent);
-            markers[id] = marker;
-        }
+        });
+        
+        popupContent += `
+                </div>
+                ${landmark.name ? `<p><strong>地标:</strong> ${landmark.name}</p>` : ''}
+            </div>
+        `;
+    } else {
+        // 单人位置 - 显示单个同学信息
+        const friend = friends[0];
+        popupContent = `
+            <div class="popup-content">
+                <h3>${friend.name}</h3>
+                <p><strong>地点:</strong> ${friend.location}</p>
+                ${friend.school ? `<p><strong>学校/单位:</strong> ${friend.school}</p>` : ''}
+                ${friend.notes ? `<p><strong>备注:</strong> ${friend.notes}</p>` : ''}
+                ${landmark.name ? `<p><strong>地标:</strong> ${landmark.name}</p>` : ''}
+            </div>
+        `;
+    }
+    
+    // 绑定弹窗到标记
+    marker.bindPopup(popupContent, { 
+        maxWidth: 300,
+        minWidth: 250
+    });
+    
+    // 存储标记和对应的同学信息
+    const locationId = `loc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    markers[locationId] = marker;
+    
+    // 为每个同学保存位置引用
+    friends.forEach(friend => {
+        friend.locationId = locationId;
+    });
+}
         
         // Update friend list
         function updateFriendList() {
@@ -1105,8 +1230,11 @@ function getCityLandmark(cityEn, cityZh) {
                 item.textContent = `${friend.name} - ${displayLocation}`;
                 
                 item.addEventListener('click', () => {
-                    map.setView(friend.coordinates, 12);
-                    markers[friend.id].openPopup();
+                    // 使用locationId找到对应的标记
+                    if (friend.locationId && markers[friend.locationId]) {
+                        map.setView(friend.coordinates, 12);
+                        markers[friend.locationId].openPopup();
+                    }
                 });
                 container.appendChild(item);
             });
